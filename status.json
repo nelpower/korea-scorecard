@@ -1,6 +1,6 @@
 {
   "date": "2026-06-02",
-  "refreshed": "2026-06-02T22:24+09:00",
+  "refreshed": "2026-06-02T22:50+09:00",
   "total": 80.0,
   "status": "第一笔·待右侧",
   "triggers": "2/5",
@@ -16,6 +16,6 @@
   "kospi": 8801.49,
   "hynix": 2360000.0,
   "concentration": 0.5252117910873709,
-  "vkospi": 70,
+  "vkospi": 73.6,
   "vkospi_src": "sticky"
 }
