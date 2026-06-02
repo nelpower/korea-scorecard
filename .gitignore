@@ -4,3 +4,5 @@ __pycache__/
 venv/
 *.xlsx
 .DS_Store
+test_datasources.py
+probe_vkospi.py

@@ -38,6 +38,7 @@ python -m http.server 8012   # 浏览器开 http://localhost:8012
 
 ## 数据来源与诚实边界
 - 价格/指数/汇率/市值/广度：FinanceDataReader（Naver/KRX 公开数据）。
-- VKOSPI、外资净流、融资余额：无稳定免费 API（pykrx 因 KRX 改版需登录），故手填。
+- VKOSPI：脚本 best-effort 抓 investing.com（你本地 IP 可成功）；但 **GitHub 云端数据中心 IP 被 Cloudflare 403**，故云端自动沿用 `state.json` 里上次的值（仪表盘标「沿用·手填」）。Naver/Yahoo/stooq 无此指数、KRX 需登录。要真·云端自动：① 本地每日小任务抓 VKOSPI 推回仓库（开机即更、关机沿用），或 ② KRX 官方 API（注册免费 key）。VKOSPI 走势慢，每周手机更一次也够。
+- 外资净流、融资余额：pykrx 因 KRX 改版需登录，无免费 API，手填。
 - ELS knock-in、put/call skew、NPS 配比、做空禁令：判断/需终端，手填。
 - 评分方法与 Excel 版（`korea_deleveraging_short_timing_scorecard_v2.xlsx`）一致：27 指标 5 类、方向感知、右侧 gating、VKOSPI IV 闸、数据置信度。
