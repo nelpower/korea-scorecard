@@ -27,6 +27,8 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Run refresh
+        env:
+          SCRAPERAPI_KEY: ${{ secrets.SCRAPERAPI_KEY }}   # 可选；设了就经代理抓 VKOSPI，没设则沿用 state.json
         run: python refresh.py
       - name: Commit updated dashboard
         run: |

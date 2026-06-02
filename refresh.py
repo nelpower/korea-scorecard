@@ -72,20 +72,34 @@ def fetch_market():
     return m
 
 def fetch_vkospi():
-    """investing.com 抓 VKOSPI(KSVKOSPI) 当前值；失败返回 None（由 state.json 沿用值兜底）。"""
-    import re, requests
+    """抓 VKOSPI(investing.com KSVKOSPI) 当前值；失败返回 None（由 state.json 沿用值兜底）。
+    有 SCRAPERAPI_KEY(环境变量/GitHub secret) 时经 ScraperAPI 住宅代理抓取(云端可绕过 Cloudflare 403)，
+    否则直连(仅本地住宅 IP 可成)。"""
+    import re, os, requests
     ua = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
           "Accept-Language": "en-US,en;q=0.9"}
+    key = os.environ.get("SCRAPERAPI_KEY")
+    def parse(txt):
+        m = re.search(r'instrument-price-last">([0-9.,]+)<', txt) or re.search(r'"last"\s*:\s*"?([0-9.]+)', txt)
+        if m:
+            v = float(m.group(1).replace(",", ""))
+            if 1 < v < 300:
+                return round(v, 2)
+        return None
     for url in ("https://www.investing.com/indices/kospi-volatility", "https://kr.investing.com/indices/kospi-volatility"):
         try:
-            r = requests.get(url, headers=ua, timeout=20)
-            if r.status_code != 200:
-                print(f"[warn] vkospi {url} HTTP {r.status_code}", file=sys.stderr); continue
-            m = re.search(r'instrument-price-last">([0-9.,]+)<', r.text) or re.search(r'"last"\s*:\s*"?([0-9.]+)', r.text)
-            if m:
-                v = float(m.group(1).replace(",", ""))
-                if 1 < v < 300:
-                    return round(v, 2)
+            if key:
+                r = requests.get("https://api.scraperapi.com/",
+                                 params={"api_key": key, "url": url, "country_code": "us"}, timeout=70)
+            else:
+                r = requests.get(url, headers=ua, timeout=20)
+            if r.status_code == 200:
+                v = parse(r.text)
+                if v:
+                    return v
+                print(f"[warn] vkospi {url}: 200 但未解析到价格", file=sys.stderr)
+            else:
+                print(f"[warn] vkospi {'(scraperapi) ' if key else ''}{url} HTTP {r.status_code}", file=sys.stderr)
         except Exception as e:
             print(f"[warn] vkospi {url}: {type(e).__name__}: {str(e)[:60]}", file=sys.stderr)
     return None
