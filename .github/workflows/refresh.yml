@@ -1,0 +1,41 @@
+name: refresh-scorecard
+
+on:
+  schedule:
+    # 15:42 KST = 06:42 UTC，周一至周五（韩股收盘 15:30 后错峰；GitHub cron 可能延迟几分钟，数据已结算无碍）
+    - cron: "42 6 * * 1-5"
+  workflow_dispatch: {}        # 允许手动触发
+  push:
+    branches: [ main ]
+    paths: [ "state.json", "config.py", "refresh.py" ]   # 改手填/配置后立即重算
+
+permissions:
+  contents: write              # 允许把生成的 index.html / 历史 提交回仓库
+
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run refresh
+        run: python refresh.py
+      - name: Commit updated dashboard
+        run: |
+          git config user.name  "scorecard-bot"
+          git config user.email "actions@github.com"
+          git add index.html status.json data_history.csv
+          if git diff --staged --quiet; then
+            echo "无变化（可能是周末/韩国假日，无新交易日数据）"
+          else
+            git commit -m "auto: refresh $(date -u +%Y-%m-%d) [skip ci]"
+            git push
+          fi

@@ -1,0 +1,4 @@
+finance-datareader>=0.9.96
+pandas>=2.0
+requests
+lxml
