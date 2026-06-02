@@ -71,6 +71,25 @@ def fetch_market():
         m["kospi_chg"] = (m["kospi"] / m["kospi_prev"] - 1) * 100
     return m
 
+def fetch_vkospi():
+    """investing.com 抓 VKOSPI(KSVKOSPI) 当前值；失败返回 None（由 state.json 沿用值兜底）。"""
+    import re, requests
+    ua = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9"}
+    for url in ("https://www.investing.com/indices/kospi-volatility", "https://kr.investing.com/indices/kospi-volatility"):
+        try:
+            r = requests.get(url, headers=ua, timeout=20)
+            if r.status_code != 200:
+                print(f"[warn] vkospi {url} HTTP {r.status_code}", file=sys.stderr); continue
+            m = re.search(r'instrument-price-last">([0-9.,]+)<', r.text) or re.search(r'"last"\s*:\s*"?([0-9.]+)', r.text)
+            if m:
+                v = float(m.group(1).replace(",", ""))
+                if 1 < v < 300:
+                    return round(v, 2)
+        except Exception as e:
+            print(f"[warn] vkospi {url}: {type(e).__name__}: {str(e)[:60]}", file=sys.stderr)
+    return None
+
 # ---------------- 算分 ----------------
 def auto_score(ind, m, state):
     a = ind["auto"]
@@ -181,6 +200,7 @@ def fmt(x, n=0):
 def render(m, r, state, hist_tail):
     now = datetime.now(KST).strftime("%Y-%m-%d %H:%M KST")
     ddate = m.get("date", "—")
+    vk_src = "自动·investing" if state.get("_vk_src") == "auto" else "沿用·手填"
     # 触发器行
     trig_labels = {
         "T1":"① 外资连续净卖且 K200 不再创新高",
@@ -219,7 +239,7 @@ def render(m, r, state, hist_tail):
         ("USD/KRW", fmt(m.get("usdkrw"),1)),
         ("双雄市值占比", f'{m["concentration"]*100:.1f}%' if "concentration" in m else "—"),
         ("广度(涨/跌)", f'{m.get("adv","—")}/{m.get("dec","—")}'),
-        ("VKOSPI(手填)", state.get("vkospi","—")),
+        (f"VKOSPI({vk_src})", state.get("vkospi","—")),
     ]
     cards_html = "".join(f'<div class="card"><span>{esc(k)}</span><b>{v}</b></div>' for k,v in auto_cards)
     # 手动新鲜度
@@ -288,7 +308,7 @@ a{{color:#7fa8ff}}
 <div class="trigtot">{r['trig_n']} / 5</div></div>
 
 <div class="sec"><div class="sechd">⚠️ IV 闸门（VKOSPI 越高 put 越贵）</div>
-<div class="ivbox" style="background:{r['iv_color']}"><b>{esc(r['iv_label'])}　VKOSPI {esc(state.get('vkospi','—'))}　仓位×{r['iv_factor']}</b>
+<div class="ivbox" style="background:{r['iv_color']}"><b>{esc(r['iv_label'])}　VKOSPI {esc(state.get('vkospi','—'))}（{esc(vk_src)}）　仓位×{r['iv_factor']}</b>
 <p>{esc(r['iv_text'])}</p></div></div>
 
 <div class="sec"><div class="sechd">五大类别</div>{cat_html}
@@ -316,6 +336,11 @@ def main():
     m = fetch_market()
     if "kospi" not in m:
         print("[fatal] 行情抓取失败，保留上次页面", file=sys.stderr); sys.exit(1)
+    vk_auto = fetch_vkospi()
+    if vk_auto is not None:
+        state["vkospi"] = vk_auto; state["_vk_src"] = "auto"
+    else:
+        state["_vk_src"] = "sticky"
     r = compute(state, m)
     hist_tail = append_history(m, r, state) or []
     htmls = render(m, r, state, hist_tail)
@@ -324,11 +349,12 @@ def main():
     status = dict(date=m.get("date"), refreshed=datetime.now(KST).isoformat(timespec="minutes"),
                   total=r["total"], status=r["short"], triggers=f'{r["trig_n"]}/5',
                   gate_first=r["gate_first"], conf=r["conf"], categories=r["cat"],
-                  kospi=m.get("kospi"), hynix=m.get("hynix"), concentration=m.get("concentration"))
+                  kospi=m.get("kospi"), hynix=m.get("hynix"), concentration=m.get("concentration"),
+                  vkospi=state.get("vkospi"), vkospi_src=state.get("_vk_src"))
     with open(P("status.json"), "w", encoding="utf-8") as f:
         json.dump(status, f, ensure_ascii=False, indent=2)
     print(f"OK 数据日={m.get('date')} 总分={r['total']} 状态={r['short']} 触发={r['trig_n']}/5 "
-          f"置信度={r['conf']} 集中度={m.get('concentration')}")
+          f"置信度={r['conf']} 集中度={m.get('concentration')} VKOSPI={state.get('vkospi')}({state.get('_vk_src')})")
 
 if __name__ == "__main__":
     main()
