@@ -2,8 +2,10 @@ name: refresh-scorecard
 
 on:
   schedule:
-    # 15:42 KST = 06:42 UTC，周一至周五（韩股收盘 15:30 后错峰；GitHub cron 可能延迟几分钟，数据已结算无碍）
-    - cron: "42 6 * * 1-5"
+    # 17:37 KST = 08:37 UTC，周一至周五。
+    # 收盘 15:30 后约 2 小时——确保外资/散户资金流(KRX 收盘后约 1h 才定稿)当天即可抓到；
+    # 纯价格 15:40 就有，但流数据要等。错峰避开整点拥挤。
+    - cron: "37 8 * * 1-5"
   workflow_dispatch: {}        # 允许手动触发
   push:
     branches: [ main ]
