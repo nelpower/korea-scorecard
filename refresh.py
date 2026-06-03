@@ -18,6 +18,31 @@ def safe(fn, what, default=None):
         print(f"[warn] {what}: {type(e).__name__}: {str(e)[:100]}", file=sys.stderr)
         return default
 
+def fetch_foreign_flows(bizdate):
+    """Naver 投资者动向(KOSPI, 단위:억원, 最新在前)。bizdate='YYYYMMDD'。"""
+    import requests, re
+    ua = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"}
+    url = f"https://finance.naver.com/sise/investorDealTrendDay.naver?bizdate={bizdate}&sosok=01"
+    r = requests.get(url, headers=ua, timeout=20); r.encoding = "euc-kr"
+    out = []
+    for row in re.findall(r"<tr>(.*?)</tr>", r.text, re.S):
+        cells = [re.sub(r"<[^>]+>", "", c).strip().replace(",", "") for c in re.findall(r"<td[^>]*>(.*?)</td>", row, re.S)]
+        cells = [c for c in cells if c != ""]
+        if len(cells) >= 4 and re.match(r"\d{2}\.\d{2}\.\d{2}", cells[0]):
+            try: out.append({"date": cells[0], "indiv": float(cells[1]), "foreign": float(cells[2]), "inst": float(cells[3])})
+            except Exception: pass
+    return out
+
+def fetch_us_ai():
+    """美股 AI 龙头 NVDA/MU/AVGO 近 5 日均涨幅(%)。"""
+    import yfinance as yf
+    rets = []
+    for tk in ("NVDA", "MU", "AVGO"):
+        h = yf.Ticker(tk).history(period="7d")
+        if len(h) >= 2:
+            rets.append((float(h["Close"].iloc[-1]) / float(h["Close"].iloc[0]) - 1) * 100)
+    return round(sum(rets) / len(rets), 1) if rets else None
+
 # ---------------- 数据抓取 ----------------
 def fetch_market():
     import FinanceDataReader as fdr
@@ -69,6 +94,18 @@ def fetch_market():
     if "kospi" in m and m.get("kospi_prev"):
         m["index_up"] = m["kospi"] > m["kospi_prev"]
         m["kospi_chg"] = (m["kospi"] / m["kospi_prev"] - 1) * 100
+    # 外资/散户资金流(Naver), 美股AI动能, 海力士放量上影
+    if m.get("date"):
+        m["flows"] = safe(lambda: fetch_foreign_flows(m["date"].replace("-", "")), "Foreign flows", [])
+    m["us_ai"] = safe(fetch_us_ai, "US AI")
+    def hynix_ohlc():
+        df = fdr.DataReader("000660", start).dropna()
+        last = df.iloc[-1]; rng = float(last["High"] - last["Low"])
+        upsh = (float(last["High"] - last["Close"]) / rng) if rng else 0.0
+        volr = float(last["Volume"]) / float(df["Volume"].tail(20).mean())
+        return round(upsh, 2), round(volr, 2)
+    oh = safe(hynix_ohlc, "Hynix OHLC")
+    if oh: m["upshadow"], m["volratio"] = oh
     return m
 
 def fetch_vkospi():
@@ -113,6 +150,10 @@ def auto_score(ind, m, state):
     if a == "hynix_zone":    return C.score_hynix_zone(m.get("hynix"), state.get("hynix_lower",2450000), state.get("hynix_upper",2500000))
     if a == "divergence":    return C.score_divergence(m.get("samsung_ret"), m.get("hynix_ret"))
     if a == "vkospi":        return C.score_vkospi(state.get("vkospi"))
+    if a == "foreign":       return C.score_foreign(m.get("flows") or [])[0]
+    if a == "domestic":      return C.score_domestic(m.get("flows") or [])[0]
+    if a == "us_ai":         return C.score_us_ai(m.get("us_ai"))
+    if a == "upshadow":      return C.score_upshadow(m.get("upshadow"), m.get("volratio"))
     return None
 
 def compute(state, m):
@@ -136,11 +177,15 @@ def compute(state, m):
         wsum = sum(r["w"] for r in rows if r["cat"] == c)
         hsum = sum(r["h"] for r in rows if r["cat"] == c)
         cat[c] = round(hsum / wsum * 100, 1) if wsum else 0
+    # 资金流状态(优先用 Naver 投资者动向自动判定; 抓取失败则沿用 state.json)
+    flows = m.get("flows") or []
+    flow_status = (C.score_foreign(flows)[1] if flows else None) or state.get("flow_status", "")
+    domestic_status = (C.score_domestic(flows)[1] if flows else None) or state.get("domestic_status", "")
     # 触发器
     k200 = state.get("k200_status", "")
     t = {}
-    t["T1"] = state.get("flow_status") == "连续净卖/创纪录" and k200 != "创新高/强势"
-    t["T2"] = state.get("domestic_status") in ("边际减弱", "接不动/枯竭")
+    t["T1"] = flow_status == "连续净卖/创纪录" and k200 != "创新高/强势"
+    t["T2"] = domestic_status in ("边际减弱", "接不动/枯竭")
     t["T3"] = cat["杠杆/强平"] >= 80
     t["T4"] = k200 in ("跌破后反抽失败", "周线破位反抽失败")
     t["T5"] = (m.get("hynix") is not None) and (m["hynix"] >= state.get("hynix_lower", 2450000))
@@ -180,7 +225,8 @@ def compute(state, m):
     return dict(rows=rows, total=total, cat=cat, trig=t, trig_n=trig, conf=conf,
                 manual_days=days, manual_fresh=manual_fresh, iv_label=iv_label, iv_text=iv_text,
                 iv_factor=iv_factor, iv_color=iv_color, gate_first=gate_first, gate_add=gate_add,
-                short=short, full=full, bcolor=bcolor, action=action, rightside=rightside)
+                short=short, full=full, bcolor=bcolor, action=action, rightside=rightside,
+                flow_status=flow_status, domestic_status=domestic_status)
 
 # ---------------- 历史 ----------------
 HIST = P("data_history.csv")
@@ -245,6 +291,11 @@ def render(m, r, state, hist_tail):
         ind_html += (f'<tr><td>{esc(row["name"])} {srcbadge(row["esrc"])}</td>'
                      f'<td class="c">{row["w"]}</td><td class="c">{e}</td><td class="c">{row["h"]:.1f}</td></tr>')
     # 自动数据卡
+    flows = m.get("flows") or []
+    foreign_str = f'{flows[0]["foreign"]:+,.0f}' if flows else "—"
+    indiv_str = f'{flows[0]["indiv"]:+,.0f}' if flows else "—"
+    usai_str = f'{m["us_ai"]:+.1f}%' if m.get("us_ai") is not None else "—"
+    upsh_str = (f'{m["upshadow"]:.2f}×{m.get("volratio","—")}' if m.get("upshadow") is not None else "—")
     auto_cards = [
         ("KOSPI", f'{fmt(m.get("kospi"),0)}' + (f' <small>({m["kospi_chg"]:+.2f}%)</small>' if "kospi_chg" in m else "")),
         ("KOSPI200", fmt(m.get("k200"),1)),
@@ -254,8 +305,13 @@ def render(m, r, state, hist_tail):
         ("双雄市值占比", f'{m["concentration"]*100:.1f}%' if "concentration" in m else "—"),
         ("广度(涨/跌)", f'{m.get("adv","—")}/{m.get("dec","—")}'),
         (f"VKOSPI({vk_src})", state.get("vkospi","—")),
+        ("外资净流(亿won)", foreign_str),
+        ("散户净流(亿won)", indiv_str),
+        ("美股AI 5日", usai_str),
+        ("海力士上影×量比", upsh_str),
     ]
     cards_html = "".join(f'<div class="card"><span>{esc(k)}</span><b>{v}</b></div>' for k,v in auto_cards)
+    flow_note = f'资金流(自动判定，驱动①②)：外资 <b>{esc(r.get("flow_status","—"))}</b> ｜ 国内 <b>{esc(r.get("domestic_status","—"))}</b>'
     # 手动新鲜度
     md = r["manual_days"]
     if md is None: man_warn = '⚠️ 手动输入从未标注更新日期（state.json 的 manual_update）'
@@ -319,7 +375,8 @@ a{{color:#7fa8ff}}
 <div class="sec"><div class="sechd">📌 今日动作</div><div class="action">{esc(r['action'])}</div></div>
 
 <div class="sec"><div class="sechd">🎯 第一笔 PUT 触发器</div>{trig_html}
-<div class="trigtot">{r['trig_n']} / 5</div></div>
+<div class="trigtot">{r['trig_n']} / 5</div>
+<div style="font-size:11px;color:#8b93a7;margin-top:6px">{flow_note}</div></div>
 
 <div class="sec"><div class="sechd">⚠️ IV 闸门（VKOSPI 越高 put 越贵）</div>
 <div class="ivbox" style="background:{r['iv_color']}"><b>{esc(r['iv_label'])}　VKOSPI {esc(state.get('vkospi','—'))}（{esc(vk_src)}）　仓位×{r['iv_factor']}</b>

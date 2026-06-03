@@ -6,3 +6,4 @@ venv/
 .DS_Store
 test_datasources.py
 probe_vkospi.py
+probe_manual.py

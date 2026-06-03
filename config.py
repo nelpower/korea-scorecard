@@ -68,6 +68,43 @@ def score_vkospi(v):                       # 来自 state(手填的一个数)
     if v >= 25: return 2.0
     return 1.0
 
+def score_foreign(rows):                   # Naver 投资者动向: 外资净卖强度/连续性 -> (分, flow_status)
+    if not rows: return None, None
+    fl = [r["foreign"] for r in rows]      # 억원, 最新在前, 负=净卖
+    latest, cum = fl[0], sum(fl)
+    streak = 0
+    for v in fl:
+        if v < 0: streak += 1
+        else: break
+    if latest >= 0:
+        return (2.0, "净买/回补" if latest > 0 else "中性")
+    if streak >= 10 or cum <= -60000: return (5.0, "连续净卖/创纪录")
+    if streak >= 5:  return (4.5, "连续净卖/创纪录")
+    if streak >= 3:  return (4.0, "温和净卖")
+    return (3.5, "温和净卖")
+
+def score_domestic(rows):                  # 个人(散户)接盘 -> (分, domestic_status)
+    if not rows: return None, None
+    indiv, foreign = rows[0]["indiv"], rows[0]["foreign"]
+    if indiv <= 0:                         # 散户停止接盘/转卖 = 买盘枯竭
+        return (4.5, "接不动/枯竭")
+    if foreign < 0 and indiv >= -foreign * 0.8:   # 散户大举吸收外资抛压 = 脆弱杠杆接盘
+        return (4.0, "正常")
+    return (3.0, "正常")
+
+def score_us_ai(avg5d):                    # 美股AI龙头(NVDA/MU/AVGO)5日均涨幅: 越弱越危险
+    if avg5d is None: return None
+    if avg5d > 5:  return 2.0
+    if avg5d > 0:  return 3.0
+    if avg5d > -5: return 4.0
+    return 5.0
+
+def score_upshadow(upsh, volr):            # 放量上影: 上影占比 × 量比
+    if upsh is None: return None
+    s = 4.0 if upsh >= 0.5 else 3.0 if upsh >= 0.3 else 2.0
+    if volr and volr >= 1.3: s = min(5.0, s + 0.5)
+    return s
+
 # ---------- 27 指标定义 ----------
 # kind: 'auto' 用 auto_fn 算; 'manual' 从 state['manual'][key] 读
 INDICATORS = [
@@ -79,9 +116,9 @@ INDICATORS = [
  dict(key="L5", cat="杠杆/强平", w=2, name="单股/指数杠杆ETF净流入", dir="正向", kind="manual", note="2x单股杠杆吸金", src="S6"),
  dict(key="L6", cat="杠杆/强平", w=2, name="3月暴跌后再杠杆速度", dir="正向", kind="manual", note="32tn→38tn<90日", src="S8"),
  # 资金结构 (22)
- dict(key="F1", cat="资金结构", w=6, name="外资净卖强度/连续性", dir="正向", kind="manual", note="YTD净卖103tn连18日", src="S4"),
+ dict(key="F1", cat="资金结构", w=6, name="外资净卖强度/连续性", dir="正向", kind="auto", auto="foreign", note="Naver投资者动向(억원)", src="S4"),
  dict(key="F2", cat="资金结构", w=4, name="外资卖盘集中 Samsung/Hynix", dir="正向", kind="manual", note="高度集中双雄", src="S4"),
- dict(key="F3", cat="资金结构", w=4, name="国内接盘质量(散户/融资)", dir="正向", kind="manual", note="散户3月买26tn", src="S4"),
+ dict(key="F3", cat="资金结构", w=4, name="国内接盘质量(散户/融资)", dir="正向", kind="auto", auto="domestic", note="散户净买吸收外资抛压", src="S4"),
  dict(key="F4", cat="资金结构", w=3, name="韩元与股票共振走弱(USD/KRW)", dir="正向", kind="auto", auto="usdkrw", note="1,516(17年低)", src="S9"),
  dict(key="F5", cat="资金结构", w=2, name="外资借券做空/空头禁令状态", dir="正向", kind="manual", note="2025/3/31解禁", src="S12"),
  dict(key="F6", cat="资金结构", w=3, name="NPS/养老金政策托底(反身衰减)", dir="逆向", kind="manual", note="24.5%>目标20.8%超配", src="S13"),
@@ -95,13 +132,13 @@ INDICATORS = [
  dict(key="P2", cat="价格行为", w=5, name="好消息不涨/冲高回落", dir="正向", kind="manual", note="利好不涨苗头", src="S1"),
  dict(key="P3", cat="价格行为", w=3, name="Samsung 与 Hynix 分化", dir="正向", kind="auto", auto="divergence", note="涨幅分化", src="S5"),
  dict(key="P4", cat="价格行为", w=5, name="K200 破位并反抽失败【右侧总闸】", dir="正向", kind="manual", note="尚未破位", src="S1"),
- dict(key="P5", cat="价格行为", w=2, name="放量上影/买盘效率下降", dir="正向", kind="manual", note="高位放量上影", src="S7"),
+ dict(key="P5", cat="价格行为", w=2, name="放量上影/买盘效率下降", dir="正向", kind="auto", auto="upshadow", note="海力士上影占比×量比", src="S7"),
  # 波动/宏观/AI外溢 (20)
  dict(key="V1", cat="波动/宏观/AI外溢", w=4, name="VKOSPI 高位/不回落", dir="正向", kind="auto", auto="vkospi", note="~70 极端高", src="S7"),
  dict(key="V2", cat="波动/宏观/AI外溢", w=3, name="put/call skew 与 K200 对冲成本", dir="正向", kind="manual", note="put贵负carry", src="S7"),
  dict(key="V3", cat="波动/宏观/AI外溢", w=4, name="ELS/ELB knock-in 反身性", dir="正向", kind="manual", note="发行6.8x;距in 40-60%", src="S_ELS"),
  dict(key="V4", cat="波动/宏观/AI外溢", w=3, name="DRAM/DDR5 现货价拐点(vs HBM背离)", dir="正向", kind="manual", note="DDR5见顶HBM仍升", src="S_DRAM"),
- dict(key="V5", cat="波动/宏观/AI外溢", w=3, name="美股AI龙头+Micron/NVDA外溢", dir="正向", kind="manual", note="利好钝化外溢", src="S_DRAM"),
+ dict(key="V5", cat="波动/宏观/AI外溢", w=3, name="美股AI龙头+Micron/NVDA外溢", dir="正向", kind="auto", auto="us_ai", note="NVDA/MU/AVGO 5日动能", src="S_DRAM"),
  dict(key="V6", cat="波动/宏观/AI外溢", w=3, name="AI capex/ROI 叙事反转", dir="正向", kind="manual", note="叙事未反转", src="S_DRAM"),
 ]
 
