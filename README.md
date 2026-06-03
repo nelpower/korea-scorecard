@@ -11,17 +11,19 @@ KOSPI 200 Put 建仓时机表。每个韩股交易日收盘后自动抓数、重
 - `refresh.py` 抓数 → 算分 → 追加 `data_history.csv` → 生成 `index.html` + `status.json`，再提交回仓库。
 - 也可在 Actions 页面手动 **Run workflow**，或改 `state.json`/`config.py`/`refresh.py` 推送后立即重算。
 
-## 自动 vs 手填
-**自动抓取**（FinanceDataReader，每次运行实时）：
-- KOSPI / KOSPI200 / 三星 / 海力士 / USD-KRW 收盘价
-- 双雄市值占 KOSPI 比例（市值集中度）
-- 市场广度（涨/跌家数）、双雄涨幅分化、Hynix 是否进清仓区
+## 自动 vs 手填（10 项自动 / 17 项手填）
+**自动抓取**（每次运行实时，失败则沿用上次值）：
+- KOSPI / KOSPI200 / 三星 / 海力士 / USD-KRW 收盘价、市值集中度、市场广度、双雄分化、Hynix 清仓区　← FinanceDataReader
+- **VKOSPI**　← ScraperAPI 代理抓 investing.com（GitHub secret `SCRAPERAPI_KEY`；失败沿用 state.json）
+- **外资净流 + 散户接盘**（驱动触发器①②）　← Naver 投资者动向；同时自动判定 `flow_status`/`domestic_status`
+- **美股 AI 外溢**（NVDA/MU/AVGO 5 日动能）　← yfinance
+- **放量上影**（海力士上影占比×量比）　← OHLCV
 
-**手填**（判断类，或无免费数据源——编辑 `state.json`）：
-- `vkospi`：当日 VKOSPI（一个数，KRX/Investing 查）
-- `flow_status` 外资卖压、`domestic_status` 国内接盘、`k200_status` K200 技术状态
-- `manual{}`：融资余额/强平/外资净卖/ELS/DRAM 等判断类打分（0–5）
-- `hynix_lower/upper` 清仓区、`risk_budget_pct` 风险预算、`manual_update` 你上次复核日期
+**手填**（纯判断，或无免费数据源——编辑 `state.json`）：
+- `k200_status` K200 技术状态（**右侧总闸，故意保留人工**）
+- `manual{}`：融资余额/强平/신용융자/外资卖盘集中/半导体盈利/被动盘/好消息不涨/ELS/skew/DRAM/AI capex 等打分（0–5）
+- `vkospi` 仅作 ScraperAPI 失败时的兜底值；`hynix_lower/upper` 清仓区、`risk_budget_pct`、`manual_update` 复核日期
+- `flow_status`/`domestic_status` 仅作 Naver 抓取失败时的兜底
 
 > ⚠️ `k200_status` 只有选到 **「跌破后反抽失败」/「周线破位反抽失败」** 才点亮右侧总闸（触发器④）。仅「跌破支撑待反抽」不放行——这是不抄顶的硬约束。
 
@@ -38,7 +40,9 @@ python -m http.server 8012   # 浏览器开 http://localhost:8012
 
 ## 数据来源与诚实边界
 - 价格/指数/汇率/市值/广度：FinanceDataReader（Naver/KRX 公开数据）。
-- VKOSPI：脚本 best-effort 抓 investing.com（你本地 IP 可成功）；但 **GitHub 云端数据中心 IP 被 Cloudflare 403**，故云端自动沿用 `state.json` 里上次的值（仪表盘标「沿用·手填」）。Naver/Yahoo/stooq 无此指数、KRX 需登录。要真·云端自动：① 本地每日小任务抓 VKOSPI 推回仓库（开机即更、关机沿用），或 ② KRX 官方 API（注册免费 key）。VKOSPI 走势慢，每周手机更一次也够。
-- 外资净流、融资余额：pykrx 因 KRX 改版需登录，无免费 API，手填。
-- ELS knock-in、put/call skew、NPS 配比、做空禁令：判断/需终端，手填。
+- VKOSPI：经 ScraperAPI 住宅代理抓 investing.com（绕过 GitHub 机房 IP 的 Cloudflare 403）。免费额度 1000/月，每天 1 次足够；key 存 GitHub secret，不入公开代码。
+- 外资净流/散户接盘：Naver 投资者动向（投资者별 순매매, 단위 억원）。**注意 KRX 收盘后约 1h 才定稿，故刷新定在 17:37 KST。**
+- 美股 AI 外溢：yfinance（NVDA/MU/AVGO）。放量上影：海力士日 OHLCV 计算。
+- **仍无法自动**：融资余额/강제반대매매（pykrx 因 KRX 改版需登录、KOFIA 为 SPA）、ELS knock-in、put/call skew、NPS 配比、DRAM 现货、AI capex 叙事——无免费结构化源或需终端，手填。
+- **K200 反抽失败 / 好消息不涨**：技术可机械化，但**故意保留人工**——它们是右侧总闸，机械化会重蹈「提前抄顶」。
 - 评分方法与 Excel 版（`korea_deleveraging_short_timing_scorecard_v2.xlsx`）一致：27 指标 5 类、方向感知、右侧 gating、VKOSPI IV 闸、数据置信度。
