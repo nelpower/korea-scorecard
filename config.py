@@ -86,10 +86,13 @@ def score_foreign(rows):                   # Naver 投资者动向: 外资净卖
 def score_domestic(rows):                  # 个人(散户)接盘 -> (分, domestic_status)
     if not rows: return None, None
     indiv, foreign = rows[0]["indiv"], rows[0]["foreign"]
-    if indiv <= 0:                         # 散户停止接盘/转卖 = 买盘枯竭
+    if indiv <= 0:                         # 散户转卖 = 买盘枯竭
         return (4.5, "接不动/枯竭")
-    if foreign < 0 and indiv >= -foreign * 0.8:   # 散户大举吸收外资抛压 = 脆弱杠杆接盘
-        return (4.0, "正常")
+    if foreign < -20000:                   # 外资大举抛(>2万亿)时看散户吸收比=indiv/|foreign|
+        ratio = indiv / abs(foreign)
+        if ratio < 0.85: return (4.0, "边际减弱")   # 还在买但接不平外资抛压
+        if ratio < 1.10: return (3.5, "正常")       # 刚好接住
+        return (3.2, "正常")                          # 轻松接住(仍是脆弱杠杆接盘)
     return (3.0, "正常")
 
 def score_us_ai(avg5d):                    # 美股AI龙头(NVDA/MU/AVGO)5日均涨幅: 越弱越危险
