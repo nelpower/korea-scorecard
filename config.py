@@ -108,12 +108,24 @@ def score_upshadow(upsh, volr):            # 放量上影: 上影占比 × 量�
     if volr and volr >= 1.3: s = min(5.0, s + 0.5)
     return s
 
+def score_margin_l1(mg):                    # KOFIA 全市场融资余额(level+日环比) -> 0-5
+    # mg = {"total_tn","change_tn",...} 或 None。38tn≈历史纪录区。
+    if not mg or mg.get("total_tn") is None: return None
+    t, ch = mg["total_tn"], mg.get("change_tn")
+    base = 5 if t >= 39 else 4 if t >= 37.5 else 3 if t >= 35 else 2 if t >= 30 else 1
+    if ch is None: return base
+    if t >= 37.0:                           # 已在纪录区
+        if ch >= 0.25: base += 1            # 还在猛升=狂热
+        elif ch <= -0.30: base = max(base, 5)  # 从极值回落=去杠杆启动,顶格(非'安全')
+    elif ch >= 0.40: base += 1              # 非纪录区快速堆积
+    return max(0, min(5, base))
+
 # ---------- 27 指标定义 ----------
 # kind: 'auto' 用 auto_fn 算; 'manual' 从 state['manual'][key] 读
 INDICATORS = [
  # 杠杆/强平 (24)
- dict(key="L1", cat="杠杆/强平", w=6, name="全市场融资余额 level+change", dir="正向", kind="manual", note="38.02tn 创纪录(5/29)", src="S2"),
- dict(key="L2", cat="杠杆/强平", w=6, name="Samsung+Hynix 融资集中度", dir="正向", kind="manual", note="两大股融资 7.79tn(+208%YTD)", src="S2"),
+ dict(key="L1", cat="杠杆/强平", w=6, name="全市场融资余额 level+change", dir="正向", kind="auto", auto="margin_l1", note="KOFIA 신용거래융자(T+1 自动)", src="S2"),
+ dict(key="L2", cat="杠杆/强平", w=6, name="Samsung+Hynix 融资集中度", dir="正向", kind="manual", note="个股 신용잔고 无免费源,手填(7.79tn +208%YTD)", src="S2"),
  dict(key="L3", cat="杠杆/强平", w=5, name="强平/margin call 趋势", dir="正向", kind="manual", note="5/21 飙917亿", src="S3"),
  dict(key="L4", cat="杠杆/强平", w=3, name="신용융자 이용률/券商额度收紧", dir="正向", kind="manual", note="额度逼近上限", src="S3"),
  dict(key="L5", cat="杠杆/强平", w=2, name="单股/指数杠杆ETF净流入", dir="正向", kind="manual", note="2x单股杠杆吸金", src="S6"),

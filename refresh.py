@@ -43,6 +43,44 @@ def fetch_us_ai():
             rets.append((float(h["Close"].iloc[-1]) / float(h["Close"].iloc[0]) - 1) * 100)
     return round(sum(rets) / len(rets), 1) if rets else None
 
+def fetch_margin(timeout=30, proxy_key=None):
+    """KOFIA FreeSIS 신용거래융자 잔고(全市场, T+1)。返回最新交易日 + 日环比(万亿)。失败返回 None。
+    经第4 agent 独立审计:冷 POST 即 200(云端可直连), 5/29=38.0227tn 精确复现。"""
+    import requests
+    from datetime import date, timedelta
+    URL = "https://freesis.kofia.or.kr/meta/getMetaDataList.do"
+    today = date.today()
+    payload = {"dmSearch": {"tmpV40": "1000000", "tmpV41": "1", "tmpV1": "D",
+                            "tmpV45": (today - timedelta(days=12)).strftime("%Y%m%d"),
+                            "tmpV46": (today + timedelta(days=1)).strftime("%Y%m%d"),
+                            "OBJ_NM": "STATSCU0100000070BO"}}
+    hdr = {"Content-Type": "application/json", "Accept": "application/json",
+           "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"}
+    def post(use_proxy):
+        if use_proxy:
+            u = f"https://api.scraperapi.com/?api_key={proxy_key}&url={URL}"
+            return requests.post(u, json=payload, headers={"Content-Type": "application/json"}, timeout=max(timeout, 70)).json()
+        return requests.post(URL, json=payload, headers=hdr, timeout=timeout).json()
+    def parse(j):
+        ds1 = j.get("ds1")
+        if not isinstance(ds1, list) or not ds1: return None
+        rows = sorted(ds1, key=lambda x: str(x.get("TMPV1", "")), reverse=True)
+        def tn(r, k): return round(float(str(r[k]).replace(",", "")) / 1e6, 4)
+        top = rows[0]; raw = str(top["TMPV1"])
+        out = {"date": f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}", "total_tn": tn(top, "TMPV2"),
+               "kospi_tn": tn(top, "TMPV3"), "kosdaq_tn": tn(top, "TMPV4"),
+               "change_tn": round(tn(top, "TMPV2") - tn(rows[1], "TMPV2"), 4) if len(rows) > 1 else None}
+        return out
+    for use_proxy in ([False, True] if proxy_key else [False]):
+        try:
+            res = parse(post(use_proxy))
+            if res:
+                res["source"] = "kofia-proxy" if use_proxy else "kofia"
+                return res
+        except Exception as e:
+            print(f"[warn] margin {'proxy' if use_proxy else 'direct'}: {type(e).__name__}: {str(e)[:60]}", file=sys.stderr)
+    return None
+
 # ---------------- 数据抓取 ----------------
 def fetch_market():
     import FinanceDataReader as fdr
@@ -98,6 +136,7 @@ def fetch_market():
     if m.get("date"):
         m["flows"] = safe(lambda: fetch_foreign_flows(m["date"].replace("-", "")), "Foreign flows", [])
     m["us_ai"] = safe(fetch_us_ai, "US AI")
+    m["margin"] = safe(lambda: fetch_margin(proxy_key=os.environ.get("SCRAPERAPI_KEY")), "Margin", None)
     def hynix_ohlc():
         df = fdr.DataReader("000660", start).dropna()
         last = df.iloc[-1]; rng = float(last["High"] - last["Low"])
@@ -154,6 +193,7 @@ def auto_score(ind, m, state):
     if a == "domestic":      return C.score_domestic(m.get("flows") or [])[0]
     if a == "us_ai":         return C.score_us_ai(m.get("us_ai"))
     if a == "upshadow":      return C.score_upshadow(m.get("upshadow"), m.get("volratio"))
+    if a == "margin_l1":     return C.score_margin_l1(m.get("margin"))
     return None
 
 def compute(state, m):
@@ -296,6 +336,9 @@ def render(m, r, state, hist_tail):
     indiv_str = f'{flows[0]["indiv"]:+,.0f}' if flows else "—"
     usai_str = f'{m["us_ai"]:+.1f}%' if m.get("us_ai") is not None else "—"
     upsh_str = (f'{m["upshadow"]:.2f}×{m.get("volratio","—")}' if m.get("upshadow") is not None else "—")
+    mg = m.get("margin")
+    margin_str = ((f'{mg["total_tn"]:.1f}tn' + (f' {mg["change_tn"]:+.2f}' if mg.get("change_tn") is not None else '')) if mg else "—")
+    margin_lbl = (f'融资余额({mg["date"][5:]},T+1)' if mg else "融资余额(신용)")
     auto_cards = [
         ("KOSPI", f'{fmt(m.get("kospi"),0)}' + (f' <small>({m["kospi_chg"]:+.2f}%)</small>' if "kospi_chg" in m else "")),
         ("KOSPI200", fmt(m.get("k200"),1)),
@@ -309,6 +352,7 @@ def render(m, r, state, hist_tail):
         ("散户净流(亿won)", indiv_str),
         ("美股AI 5日", usai_str),
         ("海力士上影×量比", upsh_str),
+        (margin_lbl, margin_str),
     ]
     cards_html = "".join(f'<div class="card"><span>{esc(k)}</span><b>{v}</b></div>' for k,v in auto_cards)
     flow_note = f'资金流(自动判定，驱动①②)：外资 <b>{esc(r.get("flow_status","—"))}</b> ｜ 国内 <b>{esc(r.get("domestic_status","—"))}</b>'
