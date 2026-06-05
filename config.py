@@ -83,16 +83,20 @@ def score_foreign(rows):                   # Naver 投资者动向: 外资净卖
     if streak >= 3:  return (4.0, "温和净卖")
     return (3.5, "温和净卖")
 
-def score_domestic(rows):                  # 个人(散户)接盘 -> (分, domestic_status)
+def score_domestic(rows):                  # 散户接盘 vs 外资+机构卖压 -> (分, domestic_status)
     if not rows: return None, None
     indiv, foreign = rows[0]["indiv"], rows[0]["foreign"]
+    inst = rows[0].get("inst", 0)
     if indiv <= 0:                         # 散户转卖 = 买盘枯竭
         return (4.5, "接不动/枯竭")
-    if foreign < -20000:                   # 外资大举抛(>2万亿)时看散户吸收比=indiv/|foreign|
-        ratio = indiv / abs(foreign)
-        if ratio < 0.85: return (4.0, "边际减弱")   # 还在买但接不平外资抛压
-        if ratio < 1.10: return (3.5, "正常")       # 刚好接住
-        return (3.2, "正常")                          # 轻松接住(仍是脆弱杠杆接盘)
+    sell = max(0, -foreign) + max(0, -inst)        # 外资+机构净卖合计(机构也卖=卖方扩散)
+    both = foreign < 0 and inst < 0                # 外资与机构同时卖
+    if sell > 20000:                       # 大举抛压(>2万亿)时看散户独扛吸收比
+        ratio = indiv / sell
+        if ratio < 0.60: return (4.5, "接不动/枯竭")
+        if ratio < 0.85: return (4.2, "边际减弱")   # 接不平
+        if both or ratio < 1.15: return (3.8, "边际减弱")  # 机构也卖/仅刚好接平=吃力
+        return (3.2, "正常")                          # 轻松接住(仍脆弱杠杆接盘)
     return (3.0, "正常")
 
 def score_us_ai(avg5d):                    # 美股AI龙头(NVDA/MU/AVGO)5日均涨幅: 越弱越危险
