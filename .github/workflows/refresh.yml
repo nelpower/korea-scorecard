@@ -2,10 +2,12 @@ name: refresh-scorecard
 
 on:
   schedule:
-    # 17:37 KST = 08:37 UTC，周一至周五。
-    # 收盘 15:30 后约 2 小时——确保外资/散户资金流(KRX 收盘后约 1h 才定稿)当天即可抓到；
-    # 纯价格 15:40 就有，但流数据要等。错峰避开整点拥挤。
-    - cron: "37 8 * * 1-5"
+    # GitHub 免费版定时常被延迟数小时甚至跳过 → 一天多打几枪,任一命中即可(脚本按日期去重)。
+    # 时间(UTC→KST,周一至五): 06:50→15:50(收盘价已出) / 09:20→18:20(资金流/VKOSPI定稿) / 11:40→20:40(全源settle兜底)
+    # 真要分秒不差,见 README「外部定时」用 cron-job.org 调 workflow_dispatch。
+    - cron: "50 6 * * 1-5"
+    - cron: "20 9 * * 1-5"
+    - cron: "40 11 * * 1-5"
   workflow_dispatch: {}        # 允许手动触发
   push:
     branches: [ main ]

@@ -103,6 +103,21 @@ def fetch_market():
         m["usdkrw"] = float(fx["Close"].iloc[-1])
         if len(fx) > 21:
             m["usdkrw_mom"] = (float(fx["Close"].iloc[-1]) / float(fx["Close"].iloc[-22]) - 1) * 100
+    # ── yfinance 交叉源：FDR 日线收盘常滞后到当晚,yfinance 多半已有当日收盘;谁日期新用谁 ──
+    def yf_close(tk):
+        import yfinance as yf
+        h = yf.Ticker(tk).history(period="6d").dropna(subset=["Close"])
+        if not len(h): return None
+        return (float(h["Close"].iloc[-1]), float(h["Close"].iloc[-2]) if len(h) > 1 else None, h.index[-1].date().isoformat())
+    yk = safe(lambda: yf_close("^KS11"), "yf KOSPI")
+    if yk and yk[2] > m.get("date", ""):       # yfinance 比 FDR 新 → 覆盖日期+收盘
+        m["kospi"], m["kospi_prev"], m["date"] = yk
+        m["_price_src"] = "yfinance"
+        for tk, key in [("^KS200", "k200"), ("000660.KS", "hynix"), ("005930.KS", "samsung")]:
+            v = safe(lambda tk=tk: yf_close(tk), f"yf {key}")
+            if v: m[key] = v[0]
+        v = safe(lambda: yf_close("KRW=X"), "yf USDKRW")
+        if v: m["usdkrw"] = v[0]
     # 市值集中度 + 广度
     lst = safe(lambda: fdr.StockListing("KOSPI"), "Listing")
     if lst is not None and "Marcap" in lst.columns:
@@ -122,6 +137,13 @@ def fetch_market():
             if adv + dec > 0: m["decl_frac"] = dec / (adv + dec)
         except Exception as e:
             print(f"[warn] breadth: {e}", file=sys.stderr)
+    # 集中度/广度抓取失败 → 沿用历史最近值(避免分数因单次失败塌陷)
+    if "concentration" not in m:
+        lv = last_hist("concentration")
+        if lv is not None: m["concentration"], m["_conc_stale"] = lv, True
+    if "decl_frac" not in m:
+        lv = last_hist("decl_frac")
+        if lv is not None: m["decl_frac"], m["_breadth_stale"] = lv, True
     # 双雄区间收益(分化)
     def ret1m(sym):
         df = fdr.DataReader(sym, start).dropna(subset=["Close"])
@@ -271,6 +293,18 @@ def compute(state, m):
 # ---------------- 历史 ----------------
 HIST = P("data_history.csv")
 HCOLS = ["date","kospi","kospi_chg","k200","samsung","hynix","usdkrw","concentration","adv","dec","decl_frac","vkospi","total","status"]
+def last_hist(col):
+    """读 data_history.csv 该列最近一个非空值(给集中度/广度做 sticky 兜底)。"""
+    try:
+        if not os.path.exists(HIST): return None
+        with open(HIST, encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        for r in reversed(rows):
+            v = r.get(col, "")
+            if v not in ("", None): return float(v)
+    except Exception:
+        pass
+    return None
 def append_history(m, r, state):
     date = m.get("date")
     if not date: return
