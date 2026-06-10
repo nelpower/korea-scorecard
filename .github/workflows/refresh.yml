@@ -23,6 +23,8 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"   # 2026-06-16 起 GitHub 强制 Node24,提前切换消 deprecation 警告
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,5 +45,7 @@ jobs:
             echo "无变化（可能是周末/韩国假日，无新交易日数据）"
           else
             git commit -m "auto: refresh $(date -u +%Y-%m-%d) [skip ci]"
+            # 跑分期间若有人推了 state.json(手机改手填),直接 push 会被拒 → rebase 后再推
+            git pull --rebase origin main || true
             git push
           fi
