@@ -1,10 +1,11 @@
 {
   "date": "2026-06-10",
-  "refreshed": "2026-06-10T17:40+09:00",
+  "refreshed": "2026-06-10T19:30+09:00",
   "total": 86.3,
   "status": "主仓区",
   "triggers": "4/5",
   "gate_first": true,
+  "gate_add": true,
   "conf": 1.0,
   "categories": {
     "杠杆/强平": 92.9,
@@ -17,5 +18,10 @@
   "hynix": 2048000.0,
   "concentration": 0.5103990443903884,
   "vkospi": 88.35,
-  "vkospi_src": "auto"
+  "vkospi_src": "auto",
+  "flows_live": true,
+  "n_auto": 11,
+  "missing": [],
+  "stale_syms": [],
+  "warns": []
 }
