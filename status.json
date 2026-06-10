@@ -1,6 +1,6 @@
 {
   "date": "2026-06-10",
-  "refreshed": "2026-06-10T21:38+09:00",
+  "refreshed": "2026-06-10T23:40+09:00",
   "total": 86.3,
   "status": "主仓区",
   "triggers": "4/5",
@@ -16,7 +16,7 @@
   },
   "kospi": 7730.82,
   "hynix": 2048000.0,
-  "concentration": 0.5103990443903884,
+  "concentration": 0.5104,
   "vkospi": 88.35,
   "vkospi_src": "auto",
   "flows_live": true,
