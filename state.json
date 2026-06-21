@@ -1,6 +1,6 @@
 {
-  "_README": "手填输入：在手机上用 GitHub 网页版直接编辑此文件并 commit，几分钟后页面自动重算。auto 指标(外资净流/散户接盘/USD-KRW/市值集中度/广度/Hynix清仓区/双雄分化/VKOSPI/美股AI/放量上影/全市场融资余额L1)由脚本自动抓取；下面 flow_status/domestic_status/vkospi 仅作抓取失败时的兜底。",
-  "manual_update": "2026-06-20",
+  "_README": "择时表v3(30指标)。auto 指标(12个:L1融资余额/L3강제반대매매비중[KOFIA 060BO新增自动]/F1外资/F3接盘/F4 USD-KRW/M1集中度/M3广度/P1清仓区/P3分化/P5放量上影/V1 VKOSPI/V5美股AI)由脚本自动抓取。下面 manual{}=18个手填判断项;flow_status/domestic_status/vkospi 仅抓取失败时兜底。手填周更即可,标 manual_update 当天保置信度。",
+  "manual_update": "2026-06-21",
   "vkospi": 79.65,
   "flow_status": "连续净卖/创纪录",
   "domestic_status": "正常",
@@ -12,10 +12,10 @@
   "hynix_upper": 2500000,
   "risk_budget_pct": 3,
   "manual": {
-    "L1": 5, "L2": 5, "L3": 3.5, "L4": 4, "L5": 4, "L6": 5,
-    "F1": 4.5, "F2": 4.5, "F3": 4, "F5": 3, "F6": 1.5,
-    "M2": 4, "M4": 3.5,
-    "P2": 3, "P4": 1.5, "P5": 3.5,
-    "V2": 3.5, "V3": 4, "V4": 2.5, "V5": 2, "V6": 2
+    "L2": 5, "L4": 4, "L5": 4, "L6": 5,
+    "F2": 4.5, "F5": 3, "F6": 1.5,
+    "M2": 4, "M4": 3.5, "SU1": 1.5,
+    "P2": 3, "P4": 1.5,
+    "V2": 3.5, "V3": 4, "V4": 2.5, "V6": 2, "CR1": 1.5, "CR2": 2
   }
 }

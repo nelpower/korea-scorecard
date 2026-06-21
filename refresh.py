@@ -86,6 +86,44 @@ def fetch_margin(timeout=30, proxy_key=None):
             print(f"[warn] margin {'proxy' if use_proxy else 'direct'}: {type(e).__name__}: {str(e)[:60]}", file=sys.stderr)
     return None
 
+def fetch_credit(timeout=30, proxy_key=None):
+    """KOFIA 060BO 증시자금(T+1): 미수금대비 반대매매 비중%(TMPV7=强平点火温度计) + 강평额(TMPV6→억) + 예탁금(TMPV3→조)。返回最新交易日 dict 或 None。"""
+    import requests
+    from datetime import date, timedelta
+    URL = "https://freesis.kofia.or.kr/meta/getMetaDataList.do"
+    today = date.today()
+    payload = {"dmSearch": {"tmpV40": "1000000", "tmpV41": "1", "tmpV1": "D",
+                            "tmpV45": (today - timedelta(days=12)).strftime("%Y%m%d"),
+                            "tmpV46": (today + timedelta(days=1)).strftime("%Y%m%d"),
+                            "OBJ_NM": "STATSCU0100000060BO"}}
+    hdr = {"Content-Type": "application/json", "Accept": "application/json",
+           "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"}
+    def post(use_proxy):
+        if use_proxy:
+            u = f"https://api.scraperapi.com/?api_key={proxy_key}&url={URL}"
+            return requests.post(u, json=payload, headers={"Content-Type": "application/json"}, timeout=max(timeout, 70)).json()
+        return requests.post(URL, json=payload, headers=hdr, timeout=timeout).json()
+    def num(top, k):
+        try: return float(str(top[k]).replace(",", ""))
+        except Exception: return None
+    def parse(j):
+        ds1 = j.get("ds1")
+        if not isinstance(ds1, list) or not ds1: return None
+        top = sorted(ds1, key=lambda x: str(x.get("TMPV1", "")), reverse=True)[0]
+        raw = str(top["TMPV1"]); biz = num(top, "TMPV7"); ban = num(top, "TMPV6"); yet = num(top, "TMPV3")
+        return {"date": f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}", "biz": biz,
+                "banamt_eok": round(ban / 1e2) if ban is not None else None,
+                "yetak_tn": round(yet / 1e6, 2) if yet is not None else None}
+    for use_proxy in ([False, True] if proxy_key else [False]):
+        try:
+            res = parse(post(use_proxy))
+            if res and res.get("biz") is not None:
+                res["source"] = "kofia-proxy" if use_proxy else "kofia"
+                return res
+        except Exception as e:
+            print(f"[warn] credit {'proxy' if use_proxy else 'direct'}: {type(e).__name__}: {str(e)[:60]}", file=sys.stderr)
+    return None
+
 # ---------------- 数据抓取 ----------------
 def fetch_market():
     import FinanceDataReader as fdr
@@ -178,6 +216,7 @@ def fetch_market():
         m["flows"] = fl
     m["us_ai"] = safe(fetch_us_ai, "US AI")
     m["margin"] = safe(lambda: fetch_margin(proxy_key=os.environ.get("SCRAPERAPI_KEY")), "Margin", None)
+    m["credit"] = safe(lambda: fetch_credit(proxy_key=os.environ.get("SCRAPERAPI_KEY")), "Credit(060BO)", None)
     def hynix_ohlc():
         df = fdr.DataReader("000660", start).dropna()
         last = df.iloc[-1]; rng = float(last["High"] - last["Low"])
@@ -235,6 +274,7 @@ def auto_score(ind, m, state):
     if a == "us_ai":         return C.score_us_ai(m.get("us_ai"))
     if a == "upshadow":      return C.score_upshadow(m.get("upshadow"), m.get("volratio"))
     if a == "margin_l1":     return C.score_margin_l1(m.get("margin"))
+    if a == "credit_l3":     return C.score_credit_l3((m.get("credit") or {}).get("biz"))
     return None
 
 def compute(state, m):
@@ -426,6 +466,9 @@ def render(m, r, state, hist_tail):
     mg = m.get("margin")
     margin_str = ((f'{mg["total_tn"]:.1f}tn' + (f' {mg["change_tn"]:+.2f}' if mg.get("change_tn") is not None else '')) if mg else "—")
     margin_lbl = (f'融资余额({mg["date"][5:]},T+1)' if mg else "融资余额(신용)")
+    cr = m.get("credit")
+    credit_str = (f'{cr["biz"]:.1f}% / {cr["banamt_eok"]:,.0f}亿' if cr and cr.get("biz") is not None else "—")
+    yetak_str = (f'{cr["yetak_tn"]:.1f}tn' if cr and cr.get("yetak_tn") is not None else "—")
     auto_cards = [
         ("KOSPI", f'{fmt(m.get("kospi"),0)}' + (f' <small>({m["kospi_chg"]:+.2f}%)</small>' if "kospi_chg" in m else "")),
         ("KOSPI200", fmt(m.get("k200"),1)),
@@ -440,6 +483,8 @@ def render(m, r, state, hist_tail):
         ("美股AI 5日", usai_str),
         ("海力士上影×量比", upsh_str),
         (margin_lbl, margin_str),
+        ("강평비중/额(060BO)", credit_str),
+        ("예탁금(散户弹药)", yetak_str),
     ]
     cards_html = "".join(f'<div class="card"><span>{esc(k)}</span><b>{v}</b></div>' for k,v in auto_cards)
     # ①② 的判定来源要可见:自动抓到 vs 兜底手填 vs 手填超龄被禁,三种是完全不同的可信度

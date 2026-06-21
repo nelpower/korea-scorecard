@@ -134,41 +134,53 @@ def score_margin_l1(mg):                    # KOFIA 全市场融资余额(level+
     elif ch >= 0.40: base += 1              # 非纪录区快速堆积
     return max(0, min(5, base))
 
-# ---------- 27 指标定义 ----------
+def score_credit_l3(biz):   # 미수금대비 반대매매 비중% (KOFIA 060BO TMPV7) — 强平点火温度计
+    if _nn(biz): return None
+    if biz >= 10: return 5.0     # 螺旋点火
+    if biz >= 7:  return 4.0     # 强平潮
+    if biz >= 4:  return 3.0
+    if biz >= 2:  return 2.0
+    if biz >= 1:  return 1.5
+    return 1.0                   # melt-up中无强平
+
+# ---------- 30 指标定义(择时表 v3:降backdrop·升trigger·加供给/债信用FX轴) ----------
 # kind: 'auto' 用 auto_fn 算; 'manual' 从 state['manual'][key] 读
 INDICATORS = [
- # 杠杆/强平 (24)
- dict(key="L1", cat="杠杆/强平", w=6, name="全市场融资余额 level+change", dir="正向", kind="auto", auto="margin_l1", note="KOFIA 신용거래융자(T+1 自动)", src="S2"),
- dict(key="L2", cat="杠杆/强平", w=6, name="Samsung+Hynix 融资集中度", dir="正向", kind="manual", note="个股 신용잔고 无免费源,手填(7.79tn +208%YTD)", src="S2"),
- dict(key="L3", cat="杠杆/强平", w=5, name="强平/margin call 趋势", dir="正向", kind="manual", note="5/21 飙917亿", src="S3"),
- dict(key="L4", cat="杠杆/强平", w=3, name="신용융자 이용률/券商额度收紧", dir="正向", kind="manual", note="额度逼近上限", src="S3"),
- dict(key="L5", cat="杠杆/强平", w=2, name="单股/指数杠杆ETF净流入", dir="正向", kind="manual", note="2x单股杠杆吸金", src="S6"),
- dict(key="L6", cat="杠杆/强平", w=2, name="3月暴跌后再杠杆速度", dir="正向", kind="manual", note="32tn→38tn<90日", src="S8"),
- # 资金结构 (22)
- dict(key="F1", cat="资金结构", w=6, name="外资净卖强度/连续性", dir="正向", kind="auto", auto="foreign", note="Naver投资者动向(억원)", src="S4"),
- dict(key="F2", cat="资金结构", w=4, name="外资卖盘集中 Samsung/Hynix", dir="正向", kind="manual", note="高度集中双雄", src="S4"),
- dict(key="F3", cat="资金结构", w=4, name="国内接盘质量(散户/融资)", dir="正向", kind="auto", auto="domestic", note="散户净买吸收外资抛压", src="S4"),
- dict(key="F4", cat="资金结构", w=3, name="韩元与股票共振走弱(USD/KRW)", dir="正向", kind="auto", auto="usdkrw", note="1,516(17年低)", src="S9"),
- dict(key="F5", cat="资金结构", w=2, name="外资借券做空/空头禁令状态", dir="正向", kind="manual", note="2025/3/31解禁", src="S12"),
- dict(key="F6", cat="资金结构", w=3, name="NPS/养老金政策托底(反身衰减)", dir="逆向", kind="manual", note="24.5%>目标20.8%超配", src="S13"),
- # 市场结构 (15)
- dict(key="M1", cat="市场结构", w=5, name="Samsung+Hynix 占 KOSPI 市值", dir="正向", kind="auto", auto="concentration", note="≈KOSPI半数", src="S5"),
- dict(key="M2", cat="市场结构", w=3, name="科技/半导体盈利贡献集中度", dir="正向", kind="manual", note="盈利高度集中", src="S6"),
- dict(key="M3", cat="市场结构", w=5, name="广度恶化(跌>涨/加权背离)", dir="正向", kind="auto", auto="breadth", note="创新高日10只跌9", src="S6"),
- dict(key="M4", cat="市场结构", w=2, name="被动盘/程序化交易拥挤", dir="正向", kind="manual", note="被动盘接外资", src="S6"),
+ # 杠杆/强平 (22) — backdrop降权, 强平点火L3升权并改自动
+ dict(key="L1", cat="杠杆/强平", w=4, name="总押杠杆 level+change(拐头=去杠杆)", dir="正向", kind="auto", auto="margin_l1", note="KOFIA 070BO(T+1);权重6→4,拐头向下才是去杠杆信号", src="S2"),
+ dict(key="L2", cat="杠杆/强平", w=4, name="Samsung+Hynix 融资集中度", dir="正向", kind="manual", note="近恒定backdrop(降权6→4)", src="S2"),
+ dict(key="L3", cat="杠杆/强平", w=7, name="강제반대매매 비중(KOFIA 060BO·头号点火温度计)", dir="正向", kind="auto", auto="credit_l3", note="🆕060BO自动:비중≥7%=强平潮≥10%=螺旋;权重5→7", src="S3"),
+ dict(key="L4", cat="杠杆/强平", w=3, name="신용융자 이용률/券商额度收紧", dir="正向", kind="manual", note="多券商停신용=卖方抽梯(news)", src="S3"),
+ dict(key="L5", cat="杠杆/强平", w=2, name="杠杆ETF净流+AUM净赎回拐点", dir="正向", kind="manual", note="AUM由申转赎=认输(Naver etfItemList可自动化)", src="S6"),
+ dict(key="L6", cat="杠杆/强平", w=2, name="暴跌后再杠杆速度", dir="正向", kind="manual", note="32tn→38tn<90日", src="S8"),
+ # 资金结构 (19)
+ dict(key="F1", cat="资金结构", w=5, name="外资净卖强度/连续性+换手反转", dir="正向", kind="auto", auto="foreign", note="Naver投资者动向(억원);买卖换手=tactical收割", src="S4"),
+ dict(key="F2", cat="资金结构", w=3, name="外资卖盘集中 Samsung/Hynix", dir="正向", kind="manual", note="集中双雄(降权4→3)", src="S4"),
+ dict(key="F3", cat="资金结构", w=4, name="国内接盘质量+예탁금背离", dir="正向", kind="auto", auto="domestic", note="散户靠融资接盘;예탁금↓而margin↑=枯竭背离", src="S4"),
+ dict(key="F4", cat="资金结构", w=3, name="韩元与股票共振走弱(USD/KRW)", dir="正向", kind="auto", auto="usdkrw", note="~1,512极弱", src="S9"),
+ dict(key="F5", cat="资金结构", w=2, name="外资借券做空/空头禁令状态", dir="正向", kind="manual", note="解禁延续", src="S12"),
+ dict(key="F6", cat="资金结构", w=2, name="NPS/养老金政策托底(反身衰减)", dir="逆向", kind="manual", note="超配3.7pp=未来卖方(降权3→2)", src="S13"),
+ # 市场结构 (14) — backdrop降权 + 新增供给轴
+ dict(key="M1", cat="市场结构", w=3, name="Samsung+Hynix 占 KOSPI 市值", dir="正向", kind="auto", auto="concentration", note="近恒定backdrop(降权5→3)", src="S5"),
+ dict(key="M2", cat="市场结构", w=2, name="科技/半导体盈利贡献集中度", dir="正向", kind="manual", note="慢变量backdrop(降权3→2)", src="S6"),
+ dict(key="M3", cat="市场结构", w=4, name="广度恶化(跌>涨/加权背离)", dir="正向", kind="auto", auto="breadth", note="加权-等权背离(降权5→4)", src="S6"),
+ dict(key="M4", cat="市场结构", w=1, name="被动盘/程序化交易拥挤", dir="正向", kind="manual", note="被动盘接外资(降权2→1)", src="S6"),
+ dict(key="SU1", cat="市场结构", w=4, name="🆕供给/稀释冲击(lockup解禁+净供给-回购)", dir="正向", kind="manual", note="#32轴:lockup/유상증자/block vs 回购소각;DART/SEIBRO事件流(现回购소각=负供给顺风)", src="SU"),
  # 价格行为 (19)
- dict(key="P1", cat="价格行为", w=4, name="Hynix 进入 245w-250w 清仓区", dir="正向", kind="auto", auto="hynix_zone", note="清仓价 245w-250w", src="S5"),
- dict(key="P2", cat="价格行为", w=5, name="好消息不涨/冲高回落", dir="正向", kind="manual", note="利好不涨苗头", src="S1"),
- dict(key="P3", cat="价格行为", w=3, name="Samsung 与 Hynix 分化", dir="正向", kind="auto", auto="divergence", note="涨幅分化", src="S5"),
- dict(key="P4", cat="价格行为", w=5, name="K200 破位并反抽失败【右侧总闸】", dir="正向", kind="manual", note="尚未破位", src="S1"),
- dict(key="P5", cat="价格行为", w=2, name="放量上影/买盘效率下降", dir="正向", kind="auto", auto="upshadow", note="海力士上影占比×量比", src="S7"),
- # 波动/宏观/AI外溢 (20)
- dict(key="V1", cat="波动/宏观/AI外溢", w=4, name="VKOSPI 高位/不回落", dir="正向", kind="auto", auto="vkospi", note="~70 极端高", src="S7"),
- dict(key="V2", cat="波动/宏观/AI外溢", w=3, name="put/call skew 与 K200 对冲成本", dir="正向", kind="manual", note="put贵负carry", src="S7"),
- dict(key="V3", cat="波动/宏观/AI外溢", w=4, name="ELS/ELB knock-in 反身性", dir="正向", kind="manual", note="发行6.8x;距in 40-60%", src="S_ELS"),
- dict(key="V4", cat="波动/宏观/AI外溢", w=3, name="DRAM/DDR5 现货价拐点(vs HBM背离)", dir="正向", kind="manual", note="DDR5见顶HBM仍升", src="S_DRAM"),
- dict(key="V5", cat="波动/宏观/AI外溢", w=3, name="美股AI龙头+Micron/NVDA外溢", dir="正向", kind="auto", auto="us_ai", note="NVDA/MU/AVGO 5日动能", src="S_DRAM"),
- dict(key="V6", cat="波动/宏观/AI外溢", w=3, name="AI capex/ROI 叙事反转", dir="正向", kind="manual", note="叙事未反转", src="S_DRAM"),
+ dict(key="P1", cat="价格行为", w=4, name="Hynix 进入 245w-250w 清仓区", dir="正向", kind="auto", auto="hynix_zone", note="清仓价245w-250w", src="S5"),
+ dict(key="P2", cat="价格行为", w=5, name="好消息不涨/冲高回落", dir="正向", kind="manual", note="利好不再推涨(右侧关键)", src="S1"),
+ dict(key="P3", cat="价格行为", w=2, name="Samsung 与 Hynix 分化", dir="正向", kind="auto", auto="divergence", note="涨幅分化(降权3→2)", src="S5"),
+ dict(key="P4", cat="价格行为", w=5, name="K200 破位并反抽失败【右侧总闸】", dir="正向", kind="manual", note="破位+反抽失败才亮", src="S1"),
+ dict(key="P5", cat="价格行为", w=3, name="放量上影/买盘效率下降", dir="正向", kind="auto", auto="upshadow", note="上影占比×量比(升权2→3)", src="S7"),
+ # 波动/宏观/AI外溢/信用 (26) — 加债/信用/FX trigger, trim慢AI
+ dict(key="V1", cat="波动/宏观/AI外溢", w=3, name="VKOSPI 高位/不回落", dir="正向", kind="auto", auto="vkospi", note="降权4→3", src="S7"),
+ dict(key="V2", cat="波动/宏观/AI外溢", w=2, name="put/call skew 与 K200 对冲成本", dir="正向", kind="manual", note="put贵负carry(降权3→2)", src="S7"),
+ dict(key="V3", cat="波动/宏观/AI外溢", w=3, name="ELS/ELB knock-in 反身性", dir="正向", kind="manual", note="距in 40-60%(降权4→3)", src="S_ELS"),
+ dict(key="V4", cat="波动/宏观/AI外溢", w=4, name="DRAM/DDR5 现货价拐点(vs HBM背离·引擎裂缝)", dir="正向", kind="manual", note="引擎裂缝最领先扳机(升权3→4;Micron 6/24)", src="S_DRAM"),
+ dict(key="V5", cat="波动/宏观/AI外溢", w=2, name="美股AI龙头+Micron/NVDA外溢", dir="正向", kind="auto", auto="us_ai", note="NVDA/MU/AVGO 5日动能(降权3→2)", src="S_DRAM"),
+ dict(key="V6", cat="波动/宏观/AI外溢", w=2, name="AI capex/ROI 叙事反转", dir="正向", kind="manual", note="最慢但最致命(降权3→2)", src="S_DRAM"),
+ dict(key="CR1", cat="波动/宏观/AI外溢", w=5, name="🆕회사채信用利差(BBB−국고)走阔+KTB三杀", dir="正向", kind="manual", note="债/信用trigger:利差领先股市最后一跌;ECOS免费日频(可自动化)", src="CR"),
+ dict(key="CR2", cat="波动/宏观/AI外溢", w=5, name="🆕FX swap point/cross-ccy basis(美元荒)+主权CDS", dir="正向", kind="manual", note="外资出逃-via-韩元判别器;basis藏不住美元饥渴(2008/2020先崩);ECOS swap point免费", src="CR"),
 ]
 
 CATS = ["杠杆/强平", "资金结构", "市场结构", "价格行为", "波动/宏观/AI外溢"]
