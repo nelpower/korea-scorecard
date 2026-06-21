@@ -1,18 +1,18 @@
 {
   "date": "2026-06-19",
-  "refreshed": "2026-06-20T21:52+09:00",
-  "total": 76.6,
-  "status": "第一笔·待右侧",
-  "triggers": "2/5",
+  "refreshed": "2026-06-21T18:05+09:00",
+  "total": 66.6,
+  "status": "观察仓",
+  "triggers": "1/5",
   "gate_first": false,
   "gate_add": false,
   "conf": 1.0,
   "categories": {
-    "杠杆/强平": 84.6,
-    "资金结构": 75.0,
-    "市场结构": 92.0,
-    "价格行为": 67.4,
-    "波动/宏观/AI外溢": 66.0
+    "杠杆/强平": 69.5,
+    "资金结构": 74.7,
+    "市场结构": 75.0,
+    "价格行为": 66.8,
+    "波动/宏观/AI外溢": 53.5
   },
   "kospi": 9052.42,
   "hynix": 2764000.0,
@@ -20,7 +20,7 @@
   "vkospi": 83.57,
   "vkospi_src": "auto",
   "flows_live": true,
-  "n_auto": 11,
+  "n_auto": 12,
   "missing": [],
   "stale_syms": [],
   "warns": []
