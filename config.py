@@ -134,14 +134,15 @@ def score_margin_l1(mg):                    # KOFIA 全市场融资余额(level+
     elif ch >= 0.40: base += 1              # 非纪录区快速堆积
     return max(0, min(5, base))
 
-def score_credit_l3(biz):   # 미수금대비 반대매매 비중% (KOFIA 060BO TMPV7) — 强平点火温度计
-    if _nn(biz): return None
-    if biz >= 10: return 5.0     # 螺旋点火
-    if biz >= 7:  return 4.0     # 强平潮
-    if biz >= 4:  return 3.0
-    if biz >= 2:  return 2.0
-    if biz >= 1:  return 1.5
-    return 1.0                   # melt-up中无强平
+def score_credit_l3(biz):   # 미수 반대매매 비중%(060BO TMPV7) — 强平温度计。阈值锚定2年分布(499日,2024-06~2026-06)
+    if _nn(biz): return None    # 参考: 中位0.8 p90 1.7 p95 2.5 p99 6.5(=2026-03崩盘周峰) max 10.5(6/9)
+    if biz >= 10:  return 5.0   # 极端(史上仅6/9)
+    if biz >= 6.5: return 4.0   # 重度=p99=3月崩盘级
+    if biz >= 2.5: return 3.0   # 偏高=p95
+    if biz >= 1.7: return 2.0   # >p90
+    if biz >= 0.8: return 1.5   # 中位区
+    return 1.0
+    # 注:此为미수(T+2违约)通道强平,非신용维持率cascade(更大但无免费日频源);需配绝对额(TMPV6,p99=917亿/max1698亿)同看
 
 # ---------- 30 指标定义(择时表 v3:降backdrop·升trigger·加供给/债信用FX轴) ----------
 # kind: 'auto' 用 auto_fn 算; 'manual' 从 state['manual'][key] 读
