@@ -110,7 +110,7 @@ def fetch_credit(timeout=30, proxy_key=None):
         ds1 = j.get("ds1")
         if not isinstance(ds1, list) or not ds1: return None
         top = sorted(ds1, key=lambda x: str(x.get("TMPV1", "")), reverse=True)[0]
-        raw = str(top["TMPV1"]); biz = num(top, "TMPV7"); ban = num(top, "TMPV6"); yet = num(top, "TMPV3")
+        raw = str(top["TMPV1"]); biz = num(top, "TMPV7"); ban = num(top, "TMPV6"); yet = num(top, "TMPV2")  # TMPV2=投资者预托金~130万亿(=新闻口径);旧误用TMPV3(57)
         return {"date": f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}", "biz": biz,
                 "banamt_eok": round(ban / 1e2) if ban is not None else None,
                 "yetak_tn": round(yet / 1e6, 2) if yet is not None else None}
