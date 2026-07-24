@@ -1,6 +1,6 @@
 {
   "date": "2026-07-24",
-  "refreshed": "2026-07-24T18:11+09:00",
+  "refreshed": "2026-07-24T20:13+09:00",
   "total": 60.3,
   "status": "观察仓",
   "triggers": "1/5",
@@ -14,9 +14,9 @@
     "价格行为": 51.1,
     "波动/宏观/AI外溢": 53.5
   },
-  "kospi": 6728.97,
+  "kospi": 6690.62,
   "hynix": 1759000.0,
-  "concentration": 0.4947902831675121,
+  "concentration": 0.49498681933596383,
   "vkospi": 78.65,
   "vkospi_src": "auto",
   "flows_live": true,
