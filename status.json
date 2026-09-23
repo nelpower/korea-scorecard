@@ -1,7 +1,7 @@
 {
-  "date": "2026-09-21",
-  "refreshed": "2026-09-23T00:42+09:00",
-  "total": 56.4,
+  "date": "2026-09-23",
+  "refreshed": "2026-09-23T21:16+09:00",
+  "total": 57.3,
   "status": "观察仓",
   "triggers": "0/5",
   "gate_first": false,
@@ -10,14 +10,14 @@
   "categories": {
     "杠杆/强平": 59.1,
     "资金结构": 62.0,
-    "市场结构": 66.4,
+    "市场结构": 72.1,
     "价格行为": 50.0,
     "波动/宏观/AI外溢": 51.2
   },
-  "kospi": 7007.72021484375,
-  "hynix": 1868000.0,
-  "concentration": 0.5108766079122332,
-  "vkospi": 42.42,
+  "kospi": 7080.919921875,
+  "hynix": 1862000.0,
+  "concentration": 0.5176182910068948,
+  "vkospi": 42.98,
   "vkospi_src": "auto",
   "flows_live": false,
   "n_auto": 10,
@@ -25,8 +25,6 @@
     "F1",
     "F3"
   ],
-  "stale_syms": [
-    "k200"
-  ],
+  "stale_syms": [],
   "warns": []
 }
