@@ -1,33 +1,30 @@
 {
   "date": "2026-10-20",
-  "refreshed": "2026-10-20T21:16+09:00",
-  "total": 61.8,
+  "refreshed": "2026-10-20T23:20+09:00",
+  "total": 62.3,
   "status": "观察仓",
   "triggers": "0/5",
   "gate_first": false,
   "gate_add": false,
-  "conf": 0.3,
+  "conf": 0.33,
   "categories": {
     "杠杆/强平": 71.8,
     "资金结构": 62.0,
     "市场结构": 72.9,
     "价格行为": 53.2,
-    "波动/宏观/AI外溢": 52.6
+    "波动/宏观/AI外溢": 55.4
   },
   "kospi": 5552.74,
   "hynix": 1190000.0,
   "concentration": 0.46464693745044844,
-  "vkospi": null,
-  "vkospi_src": "sticky",
+  "vkospi": 49.42,
+  "vkospi_src": "auto",
   "flows_live": false,
-  "n_auto": 9,
+  "n_auto": 10,
   "missing": [
     "F1",
-    "F3",
-    "V1"
+    "F3"
   ],
   "stale_syms": [],
-  "warns": [
-    "VKOSPI 自动抓取失败且手填值已超 5 天 → 按 IV 未知最保守档(×0.4)"
-  ]
+  "warns": []
 }
