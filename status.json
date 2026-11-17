@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-16",
-  "refreshed": "2026-11-17T06:13+09:00",
+  "date": "2026-11-17",
+  "refreshed": "2026-11-18T01:30+09:00",
   "total": 57.7,
   "status": "观察仓",
   "triggers": "0/5",
@@ -14,10 +14,10 @@
     "价格行为": 50.0,
     "波动/宏观/AI外溢": 55.4
   },
-  "kospi": 5100.5,
-  "hynix": 1118000.0,
-  "concentration": 0.46696846609617626,
-  "vkospi": 52.64,
+  "kospi": 4968.48,
+  "hynix": 1100000.0,
+  "concentration": 0.46341525519941934,
+  "vkospi": 53.64,
   "vkospi_src": "auto",
   "flows_live": false,
   "n_auto": 10,
